@@ -1,0 +1,10 @@
+[package]
+name = "sayo_rs"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+futures = "0.3.30"
+hid_rs = { git = "https://github.com/svr2kos2/hid_rs.git" }
+sayo_api_rs = { git = "https://github.com/svr2kos2/sayo_api_rs.git" }
+
