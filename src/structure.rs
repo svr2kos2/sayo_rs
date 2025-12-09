@@ -1,13 +1,17 @@
 // Typed, field-based definitions for all protocol structures.
 // Legacy byte-wrapper implementations are kept below in a comment block for reference.
 
-use std::sync::{Arc, RwLock};
+use std::sync::RwLock;
 
-use futures::{executor::block_on, lock::Mutex};
+use pollster::block_on;
 use hid_rs::SafeCallback2;
 
 pub trait SayoObject {
     fn end_change(&self);
+}
+
+fn missing(field: &str) -> String {
+    format!("{field} unavailable")
 }
 
 #[repr(C)]
@@ -15,13 +19,12 @@ pub trait SayoObject {
 pub struct StringContent {
     raw: Option<sayo_api_rs::structures::StringContent>,
 }
-
 #[repr(C)]
 #[derive(Debug)]
 pub struct DeviceInfo {
     api: sayo_api_rs::device::SayoDeviceApi,
     raw: sayo_api_rs::structures::DeviceInfo,
-    key_fn_event: RwLock<Vec<SafeCallback2<u128, bool, ()>>,>,
+    key_fn_event: RwLock<Vec<SafeCallback2<u128, bool, ()>>>,
 }
 impl SayoObject for DeviceInfo {
     fn end_change(&self) {
@@ -37,37 +40,21 @@ impl DeviceInfo {
         }
     }
 
-    pub fn model_code(&self) -> Option<u16> {
-        self.raw.model_code(None)
-    }
-    pub fn ver(&self) -> Option<u16> {
-        self.raw.ver(None)
-    }
-    pub fn usb0_ori(&self) -> Option<u8> {
-        self.raw.usb0_ori(None)
-    }
-    pub fn usb1_ori(&self) -> Option<u8> {
-        self.raw.usb1_ori(None)
-    }
-    pub fn batt_lv(&self) -> Option<u8> {
-        self.raw.batt_lv(None)
-    }
-    pub fn key_fn(&self) -> Option<u8> {
-        self.raw.key_fn(None)
-    }
+    pub fn model_code(&self) -> Result<u16, String> { self.raw.model_code(None).ok_or_else(|| missing("model_code")) }
+    pub fn ver(&self) -> Result<u16, String> { self.raw.ver(None).ok_or_else(|| missing("ver")) }
+    pub fn usb0_ori(&self) -> Result<u8, String> { self.raw.usb0_ori(None).ok_or_else(|| missing("usb0_ori")) }
+    pub fn usb0_offset(&self) -> Result<u8, String> { self.raw.usb0_offset(None).ok_or_else(|| missing("usb0_offset")) }
+    pub fn usb1_ori(&self) -> Result<u8, String> { self.raw.usb1_ori(None).ok_or_else(|| missing("usb1_ori")) }
+    pub fn usb1_offset(&self) -> Result<u8, String> { self.raw.usb1_offset(None).ok_or_else(|| missing("usb1_offset")) }
+    pub fn batt_lv(&self) -> Result<u8, String> { self.raw.batt_lv(None).ok_or_else(|| missing("batt_lv")) }
+    pub fn key_fn(&self) -> Result<u8, String> { self.raw.key_fn(None).ok_or_else(|| missing("key_fn")) }
     pub fn set_key_fn(&self, key_fn: u8) {
         let _ = self.raw.key_fn(Some(key_fn));
         self.end_change();
     }
-    pub fn cpu_load_1s(&self) -> Option<u8> {
-        self.raw.cpu_load_1s(None)
-    }
-    pub fn cpu_load_1ms(&self) -> Option<u8> {
-        self.raw.cpu_load_1ms(None)
-    }
-    pub fn api_list(&self) -> Option<Vec<u8>> {
-        self.raw.api_list(None)
-    }
+    pub fn cpu_load_1s(&self) -> Result<u8, String> { self.raw.cpu_load_1s(None).ok_or_else(|| missing("cpu_load_1s")) }
+    pub fn cpu_load_1ms(&self) -> Result<u8, String> { self.raw.cpu_load_1ms(None).ok_or_else(|| missing("cpu_load_1ms")) }
+    pub fn api_list(&self) -> Result<Vec<u8>, String> { self.raw.api_list(None).ok_or_else(|| missing("api_list")) }
 }
 
 #[repr(C)]
@@ -88,104 +75,77 @@ pub struct RFConfig {
 }
 #[repr(C)]
 #[derive(Debug, Clone)]
-pub struct KeyData<T: SayoObject> {
-    parent: Arc<Mutex<Option<T>>>,
+pub struct KeyData {
     raw: sayo_api_rs::structures::KeyData,
 }
-impl<T: SayoObject> KeyData<T> {
-    pub fn key_mode(&self) -> Option<u8> {
-        self.raw.key_mode(None)
+
+impl KeyData {
+    pub fn new(raw: sayo_api_rs::structures::KeyData) -> Self {
+        Self { raw }
     }
-    pub fn set_key_mode(&self, mode: u8) {
-        let _ = self.raw.key_mode(Some(mode));
-        block_on(self.parent.lock()).as_ref().unwrap().end_change();
+
+    pub fn key_mode(&self) -> Result<u8, String> { self.raw.key_mode(None).ok_or_else(|| missing("key_mode")) }
+    pub fn key_opt0(&self) -> Result<u8, String> { self.raw.key_opt0(None).ok_or_else(|| missing("key_opt0")) }
+    pub fn key_opt1(&self) -> Result<u8, String> { self.raw.key_opt1(None).ok_or_else(|| missing("key_opt1")) }
+    pub fn key_opt2(&self) -> Result<u8, String> { self.raw.key_opt2(None).ok_or_else(|| missing("key_opt2")) }
+    pub fn key_val(&self) -> Result<Vec<u8>, String> { self.raw.key_val(None).ok_or_else(|| missing("key_val")) }
+
+    pub fn set_key_mode(&self, value: u8) {
+        let _ = self.raw.key_mode(Some(value));
     }
-    pub fn key_opt0(&self) -> Option<u8> {
-        self.raw.key_opt0(None)
+
+    pub fn set_key_opt0(&self, value: u8) {
+        let _ = self.raw.key_opt0(Some(value));
     }
-    pub fn set_key_opt0(&self, opt0: u8) {
-        let _ = self.raw.key_opt0(Some(opt0));
-        block_on(self.parent.lock()).as_ref().unwrap().end_change();
+
+    pub fn set_key_opt1(&self, value: u8) {
+        let _ = self.raw.key_opt1(Some(value));
     }
-    pub fn key_opt1(&self) -> Option<u8> {
-        self.raw.key_opt1(None)
+
+    pub fn set_key_opt2(&self, value: u8) {
+        let _ = self.raw.key_opt2(Some(value));
     }
-    pub fn set_key_opt1(&self, opt1: u8) {
-        let _ = self.raw.key_opt1(Some(opt1));
-        block_on(self.parent.lock()).as_ref().unwrap().end_change();
-    }
-    pub fn key_opt2(&self) -> Option<u8> {
-        self.raw.key_opt2(None)
-    }
-    pub fn set_key_opt2(&self, opt2: u8) {
-        let _ = self.raw.key_opt2(Some(opt2));
-        block_on(self.parent.lock()).as_ref().unwrap().end_change();
-    }
-    pub fn key_val(&self) -> Option<Vec<u8>> {
-        self.raw.key_val(None)
-    }
-    pub fn set_key_val(&self, val: Vec<u8>) {
-        let _ = self.raw.key_val(Some(val));
-        block_on(self.parent.lock()).as_ref().unwrap().end_change();
+
+    pub fn set_key_val(&self, value: Vec<u8>) {
+        let _ = self.raw.key_val(Some(value));
     }
 }
 
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct KeyInfo {
     id: u8,
     api: sayo_api_rs::device::SayoDeviceApi,
     raw: sayo_api_rs::structures::KeyInfo,
-    key_data: RwLock<Vec<KeyData<KeyInfo>>>,
 }
+
 impl SayoObject for KeyInfo {
     fn end_change(&self) {
         block_on(self.api.set_key_info(self.id, &self.raw));
     }
 }
+
 impl KeyInfo {
-    pub fn new(id: u8, api: sayo_api_rs::device::SayoDeviceApi, raw: sayo_api_rs::structures::KeyInfo) -> Arc<Mutex<Option<Self>>> {
-        let wrapper = Arc::new(Mutex::new(None));
-        let res = Self {
-            id,
-            api,
-            raw,
-            key_data: RwLock::new(Vec::new()),
-        };
-        let key_datas = res.raw
+    pub fn new(id: u8, api: sayo_api_rs::device::SayoDeviceApi, raw: sayo_api_rs::structures::KeyInfo) -> Self {
+        Self { id, api, raw }
+    }
+
+    pub fn valid(&self) -> Result<u8, String> { self.raw.valid(None).ok_or_else(|| missing("valid")) }
+    pub fn key_class(&self) -> Result<u8, String> { self.raw.key_class(None).ok_or_else(|| missing("key_class")) }
+    pub fn x(&self) -> Result<u16, String> { self.raw.key_site_x(None).ok_or_else(|| missing("x")) }
+    pub fn y(&self) -> Result<u16, String> { self.raw.key_site_y(None).ok_or_else(|| missing("y")) }
+    pub fn width(&self) -> Result<u16, String> { self.raw.key_width(None).ok_or_else(|| missing("width")) }
+    pub fn height(&self) -> Result<u16, String> { self.raw.key_height(None).ok_or_else(|| missing("height")) }
+    pub fn corner_radius(&self) -> Result<u16, String> { self.raw.fillet_angle(None).ok_or_else(|| missing("corner_radius")) }
+
+    pub fn key_fn(&self) -> Vec<KeyData> {
+        self
+            .raw
             .key_fn()
             .unwrap_or_default()
             .into_iter()
-            .map(|kd_raw| KeyData {
-                parent: wrapper.clone(),
-                raw: kd_raw,
-            })
-            .collect();
-        *res.key_data.write().unwrap() = key_datas;
-        block_on(wrapper.lock()).replace(res);
-        wrapper
-    }
-
-    pub fn valid(&self) -> Option<u8> {
-        self.raw.valid(None)
-    }
-    pub fn key_class(&self) -> Option<u8> {
-        self.raw.key_class(None)
-    }
-    pub fn x(&self) -> Option<u16> {
-        self.raw.key_site_x(None)
-    }
-    pub fn y(&self) -> Option<u16> {
-        self.raw.key_site_y(None)
-    }
-    pub fn width(&self) -> Option<u16> {
-        self.raw.key_width(None)
-    }
-    pub fn height(&self) -> Option<u16> {
-        self.raw.key_height(None)
-    }
-    pub fn corner_radius(&self) -> Option<u16> {
-        self.raw.fillet_angle(None)
+            .map(KeyData::new)
+            .collect()
     }
 }
 

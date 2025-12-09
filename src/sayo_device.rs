@@ -1,70 +1,66 @@
-use std::sync::Arc;
+use std::sync::OnceLock;
 
-use futures::lock::Mutex as AsyncMutex;
+use futures::executor::block_on;
+use futures::Future;
 
 use super::structure::*;
 
-type Field<T> = Arc<AsyncMutex<Option<T>>>;
-
 pub struct SayoDevice {
-     api: sayo_api_rs::device::SayoDeviceApi,
-     pub device_info: Field<DeviceInfo>,
-     // system_info: Field<SystemInfo>,
-     // device_config: Field<DeviceConfig>,
-     // rf_config: Field<RFConfig>,
-     pub key_infos: Vec<Field<KeyInfo>>,
-     // led_infos: Vec<Field<LEDInfo>>,
-     // color_tables: Vec<Field<ColorTable>>,
-     // touch_sensitivities: Vec<Field<TouchSensitivity>>,
-     // analog_key_infos: Vec<Field<AnalogKeyInfo>>,
-     // scripts: Vec<Field<SayoScript>>,
-     // analog_key_infos2: Vec<Field<AnalogKeyInfo2>>,
-     // advanced_key_binding: Field<AdvancedKeyBinding>,
-     // display_assets: Field<DisplayAssets>,
-     // lcd_draw_data: Field<LcdDrawData>,
-     // led_effects: Vec<Field<LedEffect>>,
-     // gamepad_cfg: Field<GamePadCfg>,
-     // ambient_led: Field<AmbientLED>,
+    api: sayo_api_rs::device::SayoDeviceApi,
 }
 
 impl SayoDevice {
+    fn run_async<T: Send + 'static>(future: impl Future<Output = T> + Send + 'static) -> T {
+        std::thread::spawn(move || block_on(future)).join().expect("async worker panicked")
+    }
+
+    pub fn ensure_runtime() {
+        static INIT: OnceLock<()> = OnceLock::new();
+        INIT.get_or_init(|| {
+            println!("Initializing SayoDevice runtime...");
+            Self::run_async(sayo_api_rs::device::init_sayo_device());
+        });
+    }
+
     pub fn new(uuid: u128) -> Self {
-        SayoDevice {
-            api: sayo_api_rs::device::SayoDeviceApi::from_uuid(uuid),
-            device_info: Arc::new(AsyncMutex::new(None)),
-            key_infos: vec![],
+        Self::from_api(sayo_api_rs::device::SayoDeviceApi::from_uuid(uuid))
+    }
+
+    pub fn from_api(api: sayo_api_rs::device::SayoDeviceApi) -> Self {
+        Self { api }
+    }
+
+    pub fn uuid(&self) -> u128 {
+        self.api.uuid
+    }
+
+    pub fn get_device_list() -> Vec<SayoDevice> {
+        Self::ensure_runtime();
+        Self::run_async(sayo_api_rs::device::get_device_list())
+            .into_iter()
+            .map(SayoDevice::from_api)
+            .collect()
+    }
+
+    pub fn device_info(&self) -> Result<DeviceInfo, String> {
+        Self::ensure_runtime();
+        let api = self.api.clone();
+        match Self::run_async(async move { api.get_device_info().await }) {
+            Some(raw) => Ok(DeviceInfo::new(self.api.clone(), raw)),
+            None => Err("device_info unavailable".to_string()),
         }
     }
 
-    pub async fn init_device_info(&self) {
-        if self.device_info.lock().await.is_some() {
-            return;
-        }
-        let device_info = self.api.get_device_info().await;
-        if device_info.is_none() {
-            return;
-        }
-        let mut guard = self.device_info.lock().await;
-        *guard = Some(DeviceInfo::new(self.api.clone(), device_info.unwrap()));
+    pub fn key_infos(&self) -> Result<Vec<KeyInfo>, String> {
+        Self::ensure_runtime();
+        let api = self.api.clone();
+        let raws = Self::run_async(async move { api.get_key_infos().await });
+        let infos = raws
+            .into_iter()
+            .enumerate()
+            .map(|(idx, raw)| KeyInfo::new(idx as u8, self.api.clone(), raw))
+            .collect();
+        Ok(infos)
     }
-
-    pub async fn init_key_infos(&mut self) {
-        if self.key_infos.len() > 0 {
-            return;
-        }
-        let key_infos =
-            self.api
-                .get_key_infos()
-                .await
-                .iter()
-                .enumerate()
-                .map(|(idx, ki_raw)| {
-                    KeyInfo::new(idx as u8, self.api.clone(), ki_raw.clone())
-                })
-                .collect();
-
-        self.key_infos = key_infos;
-    }
-    
 }
 

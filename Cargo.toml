@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 futures = "0.3.30"
-hid_rs = { git = "https://github.com/svr2kos2/hid_rs.git" }
-sayo_api_rs = { git = "https://github.com/svr2kos2/sayo_api_rs.git" }
-
+hid_rs = { path = "../hid_rs" }
+# sayo_api_rs = { git = "https://github.com/svr2kos2/sayo_api_rs.git" }
+sayo_api_rs = { path = "../sayo_api_rs" }
+pollster = "0.3"
