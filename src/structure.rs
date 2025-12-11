@@ -52,6 +52,11 @@ impl DeviceInfo {
         let _ = self.raw.key_fn(Some(key_fn));
         self.end_change();
     }
+
+    /// 仅本地更新缓存值，不触发设备写入（用于广播同步）。
+    pub fn set_key_fn_local(&self, key_fn: u8) {
+        let _ = self.raw.key_fn(Some(key_fn));
+    }
     pub fn cpu_load_1s(&self) -> Result<u8, String> { self.raw.cpu_load_1s(None).ok_or_else(|| missing("cpu_load_1s")) }
     pub fn cpu_load_1ms(&self) -> Result<u8, String> { self.raw.cpu_load_1ms(None).ok_or_else(|| missing("cpu_load_1ms")) }
     pub fn api_list(&self) -> Result<Vec<u8>, String> { self.raw.api_list(None).ok_or_else(|| missing("api_list")) }

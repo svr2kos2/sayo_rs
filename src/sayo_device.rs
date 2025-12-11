@@ -2,9 +2,14 @@ use std::sync::OnceLock;
 
 use futures::executor::block_on;
 use futures::Future;
+use hid_rs::{SafeCallback, SafeCallback2};
+use pollster::FutureExt;
+use sayo_api_rs::device::{sub_broadcast, sub_cmd_response};
+use sayo_api_rs::structures::{BroadCast, HidReportHeader};
 
 use super::structure::*;
 
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct SayoDevice {
     api: sayo_api_rs::device::SayoDeviceApi,
 }
@@ -32,6 +37,22 @@ impl SayoDevice {
 
     pub fn uuid(&self) -> u128 {
         self.api.uuid
+    }
+
+    pub async fn sub_cmd_response(&self, callback: &SafeCallback2<u128, (HidReportHeader, Vec<u8>), ()>,
+        ) -> Result<(), String> {
+        sub_cmd_response(self.api.uuid, callback).await
+    }
+    pub async fn unsub_cmd_response(&self) -> Result<(), String> {
+        sayo_api_rs::device::unsub_cmd_response(self.api.uuid).await
+    }
+
+    pub async fn sub_broadcast(&self, callback: &SafeCallback2<u128, BroadCast, ()>) -> Result<(), String> {
+        sub_broadcast(self.api.uuid, callback).await
+    }
+
+    pub async fn unsub_broadcast(&self) -> Result<(), String> {
+        sayo_api_rs::device::unsub_broadcast(self.api.uuid).await
     }
 
     pub fn get_device_list() -> Vec<SayoDevice> {
