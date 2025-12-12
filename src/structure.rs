@@ -40,6 +40,10 @@ impl DeviceInfo {
         }
     }
 
+    pub(crate) fn raw_inner(&self) -> &sayo_api_rs::structures::DeviceInfo {
+        &self.raw
+    }
+
     pub fn model_code(&self) -> Result<u16, String> { self.raw.model_code(None).ok_or_else(|| missing("model_code")) }
     pub fn ver(&self) -> Result<u16, String> { self.raw.ver(None).ok_or_else(|| missing("ver")) }
     pub fn usb0_ori(&self) -> Result<u8, String> { self.raw.usb0_ori(None).ok_or_else(|| missing("usb0_ori")) }
